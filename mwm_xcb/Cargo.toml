@@ -1,0 +1,12 @@
+[package]
+name = "mwm_xcb"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.52"
+bevy_app = "0.5.0"
+bevy_ecs = "0.5.0"
+log = "0.4.14"
+rustc-hash = "1.1.0"
+xcb = { version = "0.10.1", features = ["randr", "thread"] }
