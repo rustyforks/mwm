@@ -2,9 +2,10 @@ use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use log::{trace, warn};
 
-use crate::event_type::XcbEventType;
+use crate::component::XWinId;
+use crate::xcb_event_type::XcbEventType;
 use crate::xconn::XConn;
-use crate::{events as ev, MouseButton, Region, XWinId};
+use crate::{event as ev, MouseButton, Region};
 
 /// Polls as many XCB events as are in the queue
 pub fn _poll_xcb_events(xconn: Res<XConn>) -> Vec<xcb::GenericEvent> {
@@ -44,6 +45,19 @@ pub fn flush_xcb(xconn: ResMut<XConn>) {
     }
 }
 
+// temporary workaround to not having any output handling
+//
+// this system runs once at startup, ensures there is only one screen connected
+// and generates one "screen added" event
+pub fn add_singleton_output(xconn: Res<XConn>, mut ev_screen_added: EventWriter<ev::ScreenAdded>) {
+    let mut outputs = xconn.current_outputs();
+    assert!(outputs.len() == 1);
+    let output = outputs.pop().unwrap();
+    let e = ev::ScreenAdded { name: output.name, region: output.region };
+    trace!("received event {e:?}");
+    ev_screen_added.send(e);
+}
+
 /// Processes XCB events
 ///
 /// Converts xcb::GenericEvent into concrete event types and forwards them as
@@ -61,23 +75,25 @@ pub fn flush_xcb(xconn: ResMut<XConn>) {
 pub fn process_xcb_events(
     In(events): In<Vec<xcb::GenericEvent>>,
     xconn: ResMut<XConn>,
-    mut ev_button_press: EventWriter<ev::ButtonPress>,
-    mut ev_button_release: EventWriter<ev::ButtonRelease>,
     // mut ev_client_message: EventWriter<ev::ClientMessage>,
-    // mut ev_configure_notify: EventWriter<ev::ConfigureNotify>,
-    mut ev_configure_request: EventWriter<ev::ConfigureRequest>,
-    mut ev_create_notify: EventWriter<ev::CreateNotify>,
-    mut ev_destroy_notify: EventWriter<ev::DestroyNotify>,
     // mut ev_enter: EventWriter<ev::Enter>,
     // mut ev_focus_in: EventWriter<ev::FocusIn>,
     // mut ev_focus_out: EventWriter<ev::FocusOut>,
     // mut ev_key_press: EventWriter<ev::KeyPress>,
     // mut ev_leave: EventWriter<ev::Leave>,
-    mut ev_map_request: EventWriter<ev::MapRequest>,
     // mut ev_motion_notify: EventWriter<ev::MotionNotify>,
     // mut ev_property_notify: EventWriter<ev::PropertyNotify>,
     // mut ev_randr_notify: EventWriter<ev::RandrNotify>,
     // mut ev_screen_change: EventWriter<ev::ScreenChange>,
+    mut ev_button_press: EventWriter<ev::ButtonPress>,
+    mut ev_button_release: EventWriter<ev::ButtonRelease>,
+    mut ev_configure_notify: EventWriter<ev::ConfigureNotify>,
+    mut ev_configure_request: EventWriter<ev::ConfigureRequest>,
+    mut ev_create_notify: EventWriter<ev::CreateNotify>,
+    mut ev_destroy_notify: EventWriter<ev::DestroyNotify>,
+    mut ev_map_notify: EventWriter<ev::MapNotify>,
+    mut ev_map_request: EventWriter<ev::MapRequest>,
+    mut ev_unmap_notify: EventWriter<ev::UnmapNotify>,
 ) {
     for event in events.into_iter() {
         let etype = match XcbEventType::try_from(event.response_type()) {
@@ -120,27 +136,28 @@ pub fn process_xcb_events(
                 ev_button_release.send(e);
             },
 
-            // XcbEventType::ConfigureNotify => {
-            //     let e = unsafe { xcb::cast_event::<xcb::ConfigureNotifyEvent>(&event) };
-            //     let window = XWinId::from_raw(e.window());
-            //     let above_sibling = e.above_sibling();
-            //     let e = ev::ConfigureNotify {
-            //         event: XWinId::from_raw(e.event()),
-            //         window,
-            //         above_sibling: XWinId::from_raw_nullable(above_sibling),
-            //         region: Region {
-            //             x: e.x().into(),
-            //             y: e.y().into(),
-            //             w: e.width().into(),
-            //             h: e.height().into(),
-            //         },
-            //         border_width: e.border_width(),
-            //         override_redirect: e.override_redirect(),
-            //         is_root: window == xconn.root(),
-            //     };
-            //     trace!("received event {e:?}");
-            //     ev_configure_notify.send(e);
-            // },
+            XcbEventType::ConfigureNotify => {
+                let e = unsafe { xcb::cast_event::<xcb::ConfigureNotifyEvent>(&event) };
+                let window = XWinId::from_raw(e.window());
+                let above_sibling = e.above_sibling();
+                let e = ev::ConfigureNotify {
+                    event: XWinId::from_raw(e.event()),
+                    window,
+                    above_sibling: XWinId::from_raw_nullable(above_sibling),
+                    region: Region {
+                        x: e.x().into(),
+                        y: e.y().into(),
+                        w: e.width().into(),
+                        h: e.height().into(),
+                    },
+                    border_width: e.border_width(),
+                    override_redirect: e.override_redirect(),
+                    is_root: window == xconn.root(),
+                };
+                trace!("received event {e:?}");
+                ev_configure_notify.send(e);
+            },
+
             XcbEventType::ConfigureRequest => {
                 let e = unsafe { xcb::cast_event::<xcb::ConfigureRequestEvent>(&event) };
                 let window = XWinId::from_raw(e.window());
@@ -191,22 +208,36 @@ pub fn process_xcb_events(
                 ev_destroy_notify.send(e);
             },
 
+            XcbEventType::MapNotify => {
+                let e = unsafe { xcb::cast_event::<xcb::MapNotifyEvent>(&event) };
+                let e = ev::MapNotify {
+                    event: XWinId::from_raw(e.event()),
+                    window: XWinId::from_raw(e.window()),
+                    override_redirect: e.override_redirect(),
+                };
+                trace!("received event {e:?}");
+                ev_map_notify.send(e);
+            },
+
             XcbEventType::MapRequest => {
                 let e = unsafe { xcb::cast_event::<xcb::MapRequestEvent>(&event) };
-                // let id = XWinId(e.window());
-                // let override_redirect = match xconn.get_window_attributes(id) {
-                //     Ok(reply) => reply.override_redirect(),
-                //     Err(err) => {
-                //         warn!("unable to get override_redirect information {err}");
-                //         false
-                //     },
-                // };
                 let e = ev::MapRequest {
                     parent: XWinId::from_raw(e.parent()),
                     window: XWinId::from_raw(e.window()),
                 };
                 trace!("received event {e:?}");
                 ev_map_request.send(e);
+            },
+
+            XcbEventType::UnmapNotify => {
+                let e = unsafe { xcb::cast_event::<xcb::UnmapNotifyEvent>(&event) };
+                let e = ev::UnmapNotify {
+                    event: XWinId::from_raw(e.event()),
+                    window: XWinId::from_raw(e.window()),
+                    from_configure: e.from_configure(),
+                };
+                trace!("received event {e:?}");
+                ev_unmap_notify.send(e);
             },
 
             // XcbEventType::MotionNotify => {
@@ -249,11 +280,6 @@ pub fn process_xcb_events(
             // XcbEventType::FocusOut => {
             //     let e = unsafe { xcb::cast_event::<xcb::FocusOutEvent>(&event) };
             //     Some(XEvent::FocusOut(ev::FocusOut { id: XWinId(e.event()) }))
-            // },
-
-            // XcbEventType::DestroyNotify => {
-            //     let e = unsafe { xcb::cast_event::<xcb::MapNotifyEvent>(&event) };
-            //     Some(XEvent::Destroy(ev::Destroy { id: XWinId(e.window()) }))
             // },
 
             // XcbEventType::ClientMessage => {

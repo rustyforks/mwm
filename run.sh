@@ -10,7 +10,7 @@ xephyr_pid=$!
 DISPLAY=$_DISPLAY \
 RUST_BACKTRACE=$_STACKTRACE \
 RUST_LOG="${RUST_LOG:-debug}" \
-    cargo run -- $@
+    cargo run $@
 echo $?
 
 kill $xephyr_pid

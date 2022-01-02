@@ -1,36 +1,75 @@
 use log::warn;
 
-mod atoms;
-mod event_type;
-pub mod events;
+use crate::component::XWinId;
+
+mod atom;
+mod diagnostic;
+pub mod event;
 mod plugin;
+mod xcb_event_systems;
+mod xcb_event_type;
 mod xconn;
 
-pub use plugin::*;
+pub use plugin::XcbPlugin;
 
+pub mod component {
+    use crate::Region;
 
-/// Newtype around `xcb_window_t` type which is just an alias and doesn't
-/// provide any type safety
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-pub struct XWinId(xcb::ffi::xproto::xcb_window_t);
+    /// Newtype around `xcb_window_t` type which is just an alias and doesn't
+    /// provide any type safety
+    #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+    pub struct XWinId(xcb::ffi::xproto::xcb_window_t);
 
-impl XWinId {
-    pub(crate) fn from_raw(raw: xcb::ffi::xproto::xcb_window_t) -> XWinId {
-        XWinId::from_raw_nullable(raw).expect("attempted to create NULL window id")
-    }
+    impl XWinId {
+        pub(crate) fn from_raw(raw: xcb::ffi::xproto::xcb_window_t) -> XWinId {
+            XWinId::from_raw_nullable(raw).expect("attempted to create NULL window id")
+        }
 
-    pub(crate) fn from_raw_nullable(raw: xcb::ffi::xproto::xcb_window_t) -> Option<XWinId> {
-        if raw == xcb::base::NONE {
-            None
-        } else {
-            Some(XWinId(raw))
+        pub(crate) fn from_raw_nullable(raw: xcb::ffi::xproto::xcb_window_t) -> Option<XWinId> {
+            if raw == xcb::base::NONE {
+                None
+            } else {
+                Some(XWinId(raw))
+            }
+        }
+
+        pub fn as_raw(self) -> xcb::ffi::xproto::xcb_window_t {
+            self.0
         }
     }
 
-    pub fn as_raw(self) -> xcb::ffi::xproto::xcb_window_t {
-        self.0
-    }
+
+    /// Marks windows, layers, workspaces, screens,... as focused
+    pub struct IsFocused;
+
+    /// Marks windows without the `override_redirect` flag - windows that should
+    /// be managed by the window manager
+    pub struct IsManaged;
+
+    /// Holds Region the window last reported as it's preffered dimensions, gets
+    /// inserted by CreateNotify events and updated by ConfigureRequest events
+    pub struct PrefferedSize(pub Region);
+
+    /// Marks windows which are mapped.
+    pub struct IsMapped;
+
+    /// Current window or screen size
+    pub struct Size(pub Region);
 }
+
+pub mod request {
+    use crate::Region;
+
+    /// Requests a window to be mapped or unmapped
+    pub enum RequestMap {
+        Map,
+        Unmap,
+    }
+
+    /// Requests a window to be resized
+    pub struct RequestResize(pub Region);
+}
+
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
@@ -125,7 +164,7 @@ impl MouseButton {
 }
 
 #[derive(Debug)]
-pub struct Output {
+pub(crate) struct Output {
     pub name: String,
     pub region: Region,
 }

@@ -1,11 +1,12 @@
 #![allow(dead_code)]
 
 use anyhow::{bail, Context, Result};
-use log::{error, info, warn};
+use log::{error, info};
 use rustc_hash::FxHashMap as HashMap;
 
-use crate::atoms::Atom;
-use crate::{event_type, KeyCode, MouseButton, Output, Point, Region, XWinId};
+use crate::atom::Atom;
+use crate::component::XWinId;
+use crate::{xcb_event_type, KeyCode, MouseButton, Output, Point, Region};
 
 /// data for abstracting communication with the X server via xcb
 pub struct XConn {
@@ -38,8 +39,10 @@ impl Drop for XConn {
             self.atom_id(Atom::NetActiveWindow),
         );
 
+        self.flush();
+
         // remove the RANDR_BASE constant to allow another connection to be created
-        event_type::reset_randr_base();
+        xcb_event_type::reset_randr_base();
     }
 }
 
@@ -49,7 +52,7 @@ impl XConn {
     pub(super) fn init() -> Result<XConn> {
         let (conn, _) = xcb::Connection::connect(None).context("connecting to X server")?;
 
-        let root = XWinId(
+        let root = XWinId::from_raw(
             conn.get_setup()
                 .roots()
                 .next()
@@ -62,7 +65,7 @@ impl XConn {
             .map(|atom| xcb::intern_atom(&conn, false, atom.as_str()))
             .collect::<Vec<_>>();
 
-        let check_win = XWinId(conn.generate_id());
+        let check_win = XWinId::from_raw(conn.generate_id());
 
         let create_window_cookie = xcb::create_window(
             &conn,              // xcb connection to X11
@@ -89,7 +92,7 @@ impl XConn {
             .get_extension_data(&mut xcb::randr::id())
             .context("fetching randr extension data")?
             .first_event();
-        event_type::set_randr_base(randr_base)?;
+        xcb_event_type::set_randr_base(randr_base)?;
 
         let atoms = {
             let replies = atom_cookies.into_iter().map(|cookie| {
@@ -151,7 +154,7 @@ impl XConn {
         })
     }
 
-    pub fn current_outputs(&self) -> Vec<Output> {
+    pub(crate) fn current_outputs(&self) -> Vec<Output> {
         let reply =
             xcb::randr::get_screen_resources(&self.conn, self.check_win.as_raw()).get_reply();
         let resources = match reply {
@@ -232,15 +235,13 @@ impl XConn {
     }
 
     pub fn map_window(&self, id: XWinId) {
-        if let Err(e) = xcb::map_window(&self.conn, id.as_raw()).request_check() {
-            warn!("map window {id:?}: {e}");
-        }
+        // TODO error handling
+        xcb::map_window(&self.conn, id.as_raw());
     }
 
     pub fn unmap_window(&self, id: XWinId) {
-        if let Err(e) = xcb::unmap_window(&self.conn, id.as_raw()).request_check() {
-            warn!("unmap window {id:?}: {e}");
-        }
+        // TODO error handling
+        xcb::unmap_window(&self.conn, id.as_raw());
     }
 
     pub fn send_client_event(&self, id: XWinId, atom: Atom) -> Result<()> {
@@ -259,15 +260,14 @@ impl XConn {
     }
 
     pub fn focus_client(&self, id: XWinId) {
+        // TODO error handling
         xcb::set_input_focus(
             &self.conn,                    // xcb connection to X11
             xcb::INPUT_FOCUS_PARENT as u8, // focus the parent when focus is lost
             id.as_raw(),                   // window to focus
             0,                             /* current time to avoid network race conditions (0
                                             * == current time) */
-        )
-        .request_check()
-        .unwrap();
+        );
         xcb::change_property(
             &self.conn,                          // xcb connection to X11
             xcb::PROP_MODE_REPLACE as u8,        // discard current prop and replace
@@ -276,9 +276,7 @@ impl XConn {
             xcb::xproto::ATOM_WINDOW,            // type of prop
             32,                                  // data format (8/16/32-bit)
             &[id.as_raw()],                      // data
-        )
-        .request_check()
-        .unwrap();
+        );
     }
 
     pub fn set_client_border_color(&self, id: XWinId, color: u32) {
@@ -305,6 +303,7 @@ impl XConn {
 
     pub fn grab_key(&self, key: KeyCode) {
         info!("grabbing {:?}", key);
+        // TODO error handling
         xcb::grab_key(
             &self.conn,                 // xcb connection to X11
             false,                      // don't pass grabbed events through to the client
@@ -317,6 +316,7 @@ impl XConn {
     }
 
     pub fn ungrab_key(&self, key: KeyCode) {
+        // TODO error handling
         xcb::ungrab_key(
             &self.conn,         // xcb connection to X11
             key.code,           // keycode to grab
@@ -326,6 +326,7 @@ impl XConn {
     }
 
     pub fn grab_button(&self, button: MouseButton) {
+        // TODO error handling
         xcb::grab_button(
             &self.conn,         // xcb connection to X11
             false,              // don't pass grabbed events through to the client
@@ -359,6 +360,7 @@ impl XConn {
     }
 
     pub fn warp_cursor(&self, point: Point) {
+        // TODO error handling
         xcb::warp_pointer(
             &self.conn,         // xcb connection to X11
             0,                  // source window
