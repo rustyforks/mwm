@@ -148,6 +148,7 @@ pub enum MouseButton {
 }
 
 impl MouseButton {
+    #[allow(dead_code)]
     fn from_detail(detail: u8) -> Option<MouseButton> {
         match detail {
             1 => Some(MouseButton::Left),

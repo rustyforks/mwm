@@ -1,28 +1,56 @@
 use crate::component::XWinId;
-use crate::{ClientMessageData, KeyCode, MouseButton, Point, Region};
+use crate::{Point, Region};
+
+// #[derive(Debug)]
+// pub struct ClientMessage {
+//     /// The ID of the window that sent the message
+//     pub id: XWinId,
+//     /// The data type being set
+//     pub dtype: String,
+//     /// The data itself
+//     pub data: ClientMessageData,
+// }
+
+// #[derive(Debug)]
+// pub struct PropertyNotify {
+//     /// The ID of the window that had a property changed
+//     pub id: XWinId,
+//     /// The property that changed
+//     pub atom: String,
+//     /// Is this window the root window?
+//     pub is_root: bool,
+// }
+
+// #[derive(Debug)]
+// pub struct RandrNotify;
+
+// #[derive(Debug)]
+// pub struct ScreenChange;
 
 #[derive(Debug)]
 pub struct ButtonPress {
-    /// Internal ID of the window that was clicked.
-    pub id: XWinId,
-    /// Relevant mouse button.
-    pub btn: MouseButton,
+    pub detail: xcb::Button,
+    pub time: xcb::Timestamp,
+    pub root: XWinId,
+    pub event: XWinId,
+    pub child: XWinId,
+    pub root_pos: Point,
+    pub event_pos: Point,
+    pub state: u16,
+    pub same_screen: bool,
 }
 
 #[derive(Debug)]
 pub struct ButtonRelease {
-    /// Relevant mouse button.
-    pub btn: MouseButton,
-}
-
-#[derive(Debug)]
-pub struct ClientMessage {
-    /// The ID of the window that sent the message
-    pub id: XWinId,
-    /// The data type being set
-    pub dtype: String,
-    /// The data itself
-    pub data: ClientMessageData,
+    pub detail: xcb::Button,
+    pub time: xcb::Timestamp,
+    pub root: XWinId,
+    pub event: XWinId,
+    pub child: XWinId,
+    pub root_pos: Point,
+    pub event_pos: Point,
+    pub state: u16,
+    pub same_screen: bool,
 }
 
 #[derive(Debug)]
@@ -33,7 +61,6 @@ pub struct ConfigureNotify {
     pub region: Region,
     pub border_width: u16,
     pub override_redirect: bool,
-    pub is_root: bool,
 }
 
 #[derive(Debug)]
@@ -45,7 +72,6 @@ pub struct ConfigureRequest {
     pub region: Region,
     pub border_width: u16,
     pub value_mask: u16,
-    pub is_root: bool,
 }
 
 #[derive(Debug)]
@@ -64,41 +90,58 @@ pub struct DestroyNotify {
 }
 
 #[derive(Debug)]
-pub struct Enter {
-    /// The ID of the window that was entered
-    pub id: XWinId,
-    // /// Absolute coordinate of the event
-    // pub rpt: Point,
-    // /// Coordinate of the event relative to top-left of the window itself
-    // pub wpt: Point,
+pub struct EnterNotify {
+    pub detail: u8,
+    pub time: xcb::Timestamp,
+    pub root: XWinId,
+    pub event: XWinId,
+    pub child: XWinId,
+    pub root_pos: Point,
+    pub event_pos: Point,
+    pub state: u16,
+    pub mode: u8,
+    pub same_screen_focus: u8,
 }
 
 #[derive(Debug)]
 pub struct FocusIn {
-    /// The ID of the window that gained focus
-    pub id: XWinId,
+    pub detail: u8,
+    pub event: XWinId,
+    pub mode: u8,
 }
 
 #[derive(Debug)]
 pub struct FocusOut {
-    /// The ID of the window that lost focus
-    pub id: XWinId,
+    pub detail: u8,
+    pub event: XWinId,
+    pub mode: u8,
 }
 
 #[derive(Debug)]
 pub struct KeyPress {
-    /// Received key.
-    pub key: KeyCode,
+    pub detail: xcb::Keycode,
+    pub time: xcb::Timestamp,
+    pub root: XWinId,
+    pub event: XWinId,
+    pub child: XWinId,
+    pub root_pos: Point,
+    pub event_pos: Point,
+    pub state: u16,
+    pub same_screen: bool,
 }
 
 #[derive(Debug)]
-pub struct Leave {
-    /// The ID of the window that was left
-    pub id: XWinId,
-    // /// Absolute coordinate of the event
-    // pub rpt: Point,
-    // /// Coordinate of the event relative to top-left of the window itself
-    // pub wpt: Point,
+pub struct LeaveNotify {
+    pub detail: u8,
+    pub time: xcb::Timestamp,
+    pub root: XWinId,
+    pub event: XWinId,
+    pub child: XWinId,
+    pub root_pos: Point,
+    pub event_pos: Point,
+    pub state: u16,
+    pub mode: u8,
+    pub same_screen_focus: u8,
 }
 
 #[derive(Debug)]
@@ -115,40 +158,30 @@ pub struct MapRequest {
 }
 
 #[derive(Debug)]
-pub struct UnmapNotify {
-    pub event: XWinId,
-    pub window: XWinId,
-    pub from_configure: bool,
-}
-
-#[derive(Debug)]
 pub struct MotionNotify {
-    /// Internal ID of the window that was moved across.
-    pub id: XWinId,
-    /// Absolute coordinate of the event.
-    pub rpt: Point,
-    /// Coordinate of the event relative to top-left of the window itself.
-    pub wpt: Point,
+    pub detail: xcb::Keycode,
+    pub time: xcb::Timestamp,
+    pub root: XWinId,
+    pub event: XWinId,
+    pub child: XWinId,
+    pub root_pos: Point,
+    pub event_pos: Point,
+    pub state: u16,
+    pub same_screen: bool,
 }
 
-#[derive(Debug)]
-pub struct PropertyNotify {
-    /// The ID of the window that had a property changed
-    pub id: XWinId,
-    /// The property that changed
-    pub atom: String,
-    /// Is this window the root window?
-    pub is_root: bool,
-}
-
-#[derive(Debug)]
-pub struct RandrNotify;
-
-#[derive(Debug)]
-pub struct ScreenChange;
-
+// NOTE Not an XCB event, this is our virtual event used to initially add a
+// single detected screen at when th WM is started. This should be eventually
+// replaced with properly parsed XrandR events.
 #[derive(Debug)]
 pub struct ScreenAdded {
     pub name: String,
     pub region: Region,
+}
+
+#[derive(Debug)]
+pub struct UnmapNotify {
+    pub event: XWinId,
+    pub window: XWinId,
+    pub from_configure: bool,
 }

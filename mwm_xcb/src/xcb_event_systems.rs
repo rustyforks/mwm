@@ -5,7 +5,7 @@ use log::{trace, warn};
 use crate::component::XWinId;
 use crate::xcb_event_type::XcbEventType;
 use crate::xconn::XConn;
-use crate::{event as ev, MouseButton, Region};
+use crate::{event as ev, Point, Region};
 
 /// Polls as many XCB events as are in the queue
 pub fn _poll_xcb_events(xconn: Res<XConn>) -> Vec<xcb::GenericEvent> {
@@ -74,14 +74,7 @@ pub fn add_singleton_output(xconn: Res<XConn>, mut ev_screen_added: EventWriter<
 /// Make sure to check the types thoroughly!
 pub fn process_xcb_events(
     In(events): In<Vec<xcb::GenericEvent>>,
-    xconn: ResMut<XConn>,
     // mut ev_client_message: EventWriter<ev::ClientMessage>,
-    // mut ev_enter: EventWriter<ev::Enter>,
-    // mut ev_focus_in: EventWriter<ev::FocusIn>,
-    // mut ev_focus_out: EventWriter<ev::FocusOut>,
-    // mut ev_key_press: EventWriter<ev::KeyPress>,
-    // mut ev_leave: EventWriter<ev::Leave>,
-    // mut ev_motion_notify: EventWriter<ev::MotionNotify>,
     // mut ev_property_notify: EventWriter<ev::PropertyNotify>,
     // mut ev_randr_notify: EventWriter<ev::RandrNotify>,
     // mut ev_screen_change: EventWriter<ev::ScreenChange>,
@@ -91,8 +84,14 @@ pub fn process_xcb_events(
     mut ev_configure_request: EventWriter<ev::ConfigureRequest>,
     mut ev_create_notify: EventWriter<ev::CreateNotify>,
     mut ev_destroy_notify: EventWriter<ev::DestroyNotify>,
+    mut ev_enter_notify: EventWriter<ev::EnterNotify>,
+    mut ev_focus_in: EventWriter<ev::FocusIn>,
+    mut ev_focus_out: EventWriter<ev::FocusOut>,
+    mut ev_key_press: EventWriter<ev::KeyPress>,
+    mut ev_leave_notify: EventWriter<ev::LeaveNotify>,
     mut ev_map_notify: EventWriter<ev::MapNotify>,
     mut ev_map_request: EventWriter<ev::MapRequest>,
+    mut ev_motion_notify: EventWriter<ev::MotionNotify>,
     mut ev_unmap_notify: EventWriter<ev::UnmapNotify>,
 ) {
     for event in events.into_iter() {
@@ -108,14 +107,21 @@ pub fn process_xcb_events(
             XcbEventType::ButtonPress => {
                 let e = unsafe { xcb::cast_event::<xcb::ButtonPressEvent>(&event) };
                 let e = ev::ButtonPress {
-                    id: XWinId::from_raw(e.event()),
-                    btn: match MouseButton::from_detail(e.detail()) {
-                        Some(btn) => btn,
-                        None => {
-                            warn!("unrecognized mouse button {}", e.detail());
-                            continue;
-                        },
+                    detail: e.detail(),
+                    time: e.time(),
+                    root: XWinId::from_raw(e.root()),
+                    event: XWinId::from_raw(e.event()),
+                    child: XWinId::from_raw(e.child()),
+                    root_pos: Point {
+                        x: e.root_x().into(),
+                        y: e.root_y().into(),
                     },
+                    event_pos: Point {
+                        x: e.event_x().into(),
+                        y: e.event_y().into(),
+                    },
+                    state: e.state(),
+                    same_screen: e.same_screen(),
                 };
                 trace!("received event {e:?}");
                 ev_button_press.send(e);
@@ -124,13 +130,21 @@ pub fn process_xcb_events(
             XcbEventType::ButtonRelease => {
                 let e = unsafe { xcb::cast_event::<xcb::ButtonPressEvent>(&event) };
                 let e = ev::ButtonRelease {
-                    btn: match MouseButton::from_detail(e.detail()) {
-                        Some(btn) => btn,
-                        None => {
-                            warn!("unrecognized mouse button {}", e.detail());
-                            continue;
-                        },
+                    detail: e.detail(),
+                    time: e.time(),
+                    root: XWinId::from_raw(e.root()),
+                    event: XWinId::from_raw(e.event()),
+                    child: XWinId::from_raw(e.child()),
+                    root_pos: Point {
+                        x: e.root_x().into(),
+                        y: e.root_y().into(),
                     },
+                    event_pos: Point {
+                        x: e.event_x().into(),
+                        y: e.event_y().into(),
+                    },
+                    state: e.state(),
+                    same_screen: e.same_screen(),
                 };
                 trace!("received event {e:?}");
                 ev_button_release.send(e);
@@ -138,12 +152,10 @@ pub fn process_xcb_events(
 
             XcbEventType::ConfigureNotify => {
                 let e = unsafe { xcb::cast_event::<xcb::ConfigureNotifyEvent>(&event) };
-                let window = XWinId::from_raw(e.window());
-                let above_sibling = e.above_sibling();
                 let e = ev::ConfigureNotify {
                     event: XWinId::from_raw(e.event()),
-                    window,
-                    above_sibling: XWinId::from_raw_nullable(above_sibling),
+                    window: XWinId::from_raw(e.window()),
+                    above_sibling: XWinId::from_raw_nullable(e.above_sibling()),
                     region: Region {
                         x: e.x().into(),
                         y: e.y().into(),
@@ -152,7 +164,6 @@ pub fn process_xcb_events(
                     },
                     border_width: e.border_width(),
                     override_redirect: e.override_redirect(),
-                    is_root: window == xconn.root(),
                 };
                 trace!("received event {e:?}");
                 ev_configure_notify.send(e);
@@ -160,11 +171,10 @@ pub fn process_xcb_events(
 
             XcbEventType::ConfigureRequest => {
                 let e = unsafe { xcb::cast_event::<xcb::ConfigureRequestEvent>(&event) };
-                let window = XWinId::from_raw(e.window());
                 let e = ev::ConfigureRequest {
                     stack_mode: e.stack_mode(),
                     parent: XWinId::from_raw(e.parent()),
-                    window,
+                    window: XWinId::from_raw(e.window()),
                     sibling: XWinId::from_raw_nullable(e.sibling()),
                     region: Region {
                         x: e.x().into(),
@@ -174,7 +184,6 @@ pub fn process_xcb_events(
                     },
                     border_width: e.border_width(),
                     value_mask: e.value_mask(),
-                    is_root: window == xconn.root(),
                 };
                 trace!("received event {e:?}");
                 ev_configure_request.send(e);
@@ -208,6 +217,99 @@ pub fn process_xcb_events(
                 ev_destroy_notify.send(e);
             },
 
+            XcbEventType::EnterNotify => {
+                let e = unsafe { xcb::cast_event::<xcb::EnterNotifyEvent>(&event) };
+                let e = ev::EnterNotify {
+                    detail: e.detail(),
+                    time: e.time(),
+                    root: XWinId::from_raw(e.root()),
+                    event: XWinId::from_raw(e.event()),
+                    child: XWinId::from_raw(e.child()),
+                    root_pos: Point {
+                        x: e.root_x().into(),
+                        y: e.root_y().into(),
+                    },
+                    event_pos: Point {
+                        x: e.event_x().into(),
+                        y: e.event_y().into(),
+                    },
+                    state: e.state(),
+                    mode: e.mode(),
+                    same_screen_focus: e.same_screen_focus(),
+                };
+                trace!("received event {e:?}");
+                ev_enter_notify.send(e);
+            },
+
+            XcbEventType::FocusIn => {
+                let e = unsafe { xcb::cast_event::<xcb::FocusInEvent>(&event) };
+                let e = ev::FocusIn {
+                    detail: e.detail(),
+                    event: XWinId::from_raw(e.event()),
+                    mode: e.mode(),
+                };
+                trace!("received event {e:?}");
+                ev_focus_in.send(e);
+            },
+
+            XcbEventType::FocusOut => {
+                let e = unsafe { xcb::cast_event::<xcb::FocusOutEvent>(&event) };
+                let e = ev::FocusOut {
+                    detail: e.detail(),
+                    event: XWinId::from_raw(e.event()),
+                    mode: e.mode(),
+                };
+                trace!("received event {e:?}");
+                ev_focus_out.send(e);
+            },
+
+            XcbEventType::KeyPress => {
+                let e = unsafe { xcb::cast_event::<xcb::KeyPressEvent>(&event) };
+                let e = ev::KeyPress {
+                    detail: e.detail(),
+                    time: e.time(),
+                    root: XWinId::from_raw(e.root()),
+                    event: XWinId::from_raw(e.event()),
+                    child: XWinId::from_raw(e.child()),
+                    root_pos: Point {
+                        x: e.root_x().into(),
+                        y: e.root_y().into(),
+                    },
+                    event_pos: Point {
+                        x: e.event_x().into(),
+                        y: e.event_y().into(),
+                    },
+                    state: e.state(),
+                    same_screen: e.same_screen(),
+                };
+                trace!("received event {e:?}");
+                ev_key_press.send(e);
+            },
+
+            XcbEventType::LeaveNotify => {
+                let e = unsafe { xcb::cast_event::<xcb::LeaveNotifyEvent>(&event) };
+                let e = ev::LeaveNotify {
+                    detail: e.detail(),
+                    time: e.time(),
+                    root: XWinId::from_raw(e.root()),
+                    event: XWinId::from_raw(e.event()),
+                    child: XWinId::from_raw(e.child()),
+                    root_pos: Point {
+                        x: e.root_x().into(),
+                        y: e.root_y().into(),
+                    },
+                    event_pos: Point {
+                        x: e.event_x().into(),
+                        y: e.event_y().into(),
+                    },
+                    state: e.state(),
+                    mode: e.mode(),
+                    same_screen_focus: e.same_screen_focus(),
+                };
+                trace!("received event {e:?}");
+                ev_leave_notify.send(e);
+            },
+
             XcbEventType::MapNotify => {
                 let e = unsafe { xcb::cast_event::<xcb::MapNotifyEvent>(&event) };
                 let e = ev::MapNotify {
@@ -229,6 +331,29 @@ pub fn process_xcb_events(
                 ev_map_request.send(e);
             },
 
+            XcbEventType::MotionNotify => {
+                let e = unsafe { xcb::cast_event::<xcb::MotionNotifyEvent>(&event) };
+                let e = ev::MotionNotify {
+                    detail: e.detail(),
+                    time: e.time(),
+                    root: XWinId::from_raw(e.root()),
+                    event: XWinId::from_raw(e.event()),
+                    child: XWinId::from_raw(e.child()),
+                    root_pos: Point {
+                        x: e.root_x().into(),
+                        y: e.root_y().into(),
+                    },
+                    event_pos: Point {
+                        x: e.event_x().into(),
+                        y: e.event_y().into(),
+                    },
+                    state: e.state(),
+                    same_screen: e.same_screen(),
+                };
+                trace!("received event {e:?}");
+                ev_motion_notify.send(e);
+            },
+
             XcbEventType::UnmapNotify => {
                 let e = unsafe { xcb::cast_event::<xcb::UnmapNotifyEvent>(&event) };
                 let e = ev::UnmapNotify {
@@ -239,48 +364,6 @@ pub fn process_xcb_events(
                 trace!("received event {e:?}");
                 ev_unmap_notify.send(e);
             },
-
-            // XcbEventType::MotionNotify => {
-            //     let e = unsafe { xcb::cast_event::<xcb::MotionNotifyEvent>(&event) };
-            //     Some(XEvent::MotionNotify(ev::MotionNotify {
-            //         id: XWinId(e.event()),
-            //         rpt: Point {
-            //             x: e.root_x() as u32,
-            //             y: e.root_y() as u32,
-            //         },
-            //         wpt: Point {
-            //             x: e.event_x() as u32,
-            //             y: e.event_y() as u32,
-            //         },
-            //     }))
-            // },
-
-            // XcbEventType::KeyPress => {
-            //     let e = unsafe { xcb::cast_event::<xcb::KeyPressEvent>(&event) };
-            //     Some(XEvent::KeyPress(ev::KeyPress {
-            //         key: KeyCode::from_event(e),
-            //     }))
-            // },
-
-            // XcbEventType::EnterNotify => {
-            //     let e = unsafe { xcb::cast_event::<xcb::EnterNotifyEvent>(&event) };
-            //     Some(XEvent::Enter(ev::Enter { id: XWinId(e.event()) }))
-            // },
-
-            // XcbEventType::LeaveNotify => {
-            //     let e = unsafe { xcb::cast_event::<xcb::LeaveNotifyEvent>(&event) };
-            //     Some(XEvent::Leave(ev::Leave { id: XWinId(e.event()) }))
-            // },
-
-            // XcbEventType::FocusIn => {
-            //     let e = unsafe { xcb::cast_event::<xcb::FocusInEvent>(&event) };
-            //     Some(XEvent::FocusIn(ev::FocusIn { id: XWinId(e.event()) }))
-            // },
-
-            // XcbEventType::FocusOut => {
-            //     let e = unsafe { xcb::cast_event::<xcb::FocusOutEvent>(&event) };
-            //     Some(XEvent::FocusOut(ev::FocusOut { id: XWinId(e.event()) }))
-            // },
 
             // XcbEventType::ClientMessage => {
             //     let e = unsafe { xcb::cast_event::<xcb::ClientMessageEvent>(&event) };
