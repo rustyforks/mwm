@@ -1,13 +1,10 @@
-use log::warn;
-
-use crate::component::XWinId;
-
 mod atom;
 mod diagnostic;
 pub mod event;
 mod plugin;
 mod xcb_event_systems;
 mod xcb_event_type;
+mod xcb_request_systems;
 mod xconn;
 
 pub use plugin::XcbPlugin;
@@ -57,17 +54,19 @@ pub mod component {
     pub struct Size(pub Region);
 }
 
+/// Requests are either components or events which are generated in the `Update`
+/// stage and read in the `PostUpdate` stage and turned into XCB requests
 pub mod request {
     use crate::Region;
 
-    /// Requests a window to be mapped or unmapped
+    /// Requests the marked window entity to be mapped or unmapped
     pub enum RequestMap {
         Map,
         Unmap,
     }
 
-    /// Requests a window to be resized
-    pub struct RequestResize(pub Region);
+    /// Requests the marked window entity to be resized and moved
+    pub struct RequestConfigure(pub Region);
 }
 
 
@@ -99,12 +98,12 @@ impl Region {
     }
 }
 
-#[derive(Debug, Clone)]
-pub enum ClientMessageData {
-    U8(Vec<u8>),
-    U16(Vec<u16>),
-    U32(Vec<u32>),
-}
+// #[derive(Debug, Clone)]
+// pub enum ClientMessageData {
+//     U8(Vec<u8>),
+//     U16(Vec<u16>),
+//     U32(Vec<u32>),
+// }
 
 /// X key-code with a modifier mask
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -115,27 +114,26 @@ pub struct KeyCode {
     pub code: u8,
 }
 
-impl KeyCode {
-    #[allow(dead_code)]
-    fn from_event(k: &xcb::KeyPressEvent) -> KeyCode {
-        KeyCode { mask: k.state(), code: k.detail() }
-    }
-}
+// impl KeyCode {
+//     fn from_event(k: &xcb::KeyPressEvent) -> KeyCode {
+//         KeyCode { mask: k.state(), code: k.detail() }
+//     }
+// }
 
-#[derive(Debug, Clone, Copy)]
-pub enum MouseEvent {
-    Press {
-        id: XWinId,
-        btn: MouseButton,
-        // TODO - this event could potentially use position too
-    },
-    Release {
-        btn: MouseButton,
-    },
-    Move {
-        // TODO - figure out what the events actually tell us
-    },
-}
+// #[derive(Debug, Clone, Copy)]
+// pub enum MouseEvent {
+//     Press {
+//         id: XWinId,
+//         btn: MouseButton,
+//         // TODO - this event could potentially use position too
+//     },
+//     Release {
+//         btn: MouseButton,
+//     },
+//     Move {
+//         // TODO - figure out what the events actually tell us
+//     },
+// }
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]
@@ -147,22 +145,21 @@ pub enum MouseButton {
     ScrollDown = 5,
 }
 
-impl MouseButton {
-    #[allow(dead_code)]
-    fn from_detail(detail: u8) -> Option<MouseButton> {
-        match detail {
-            1 => Some(MouseButton::Left),
-            2 => Some(MouseButton::Right),
-            3 => Some(MouseButton::Middle),
-            4 => Some(MouseButton::ScrollUp),
-            5 => Some(MouseButton::ScrollDown),
-            _ => {
-                warn!("received mouse event with an invalid button {detail}");
-                None
-            },
-        }
-    }
-}
+// impl MouseButton {
+//     fn from_detail(detail: u8) -> Option<MouseButton> {
+//         match detail {
+//             1 => Some(MouseButton::Left),
+//             2 => Some(MouseButton::Right),
+//             3 => Some(MouseButton::Middle),
+//             4 => Some(MouseButton::ScrollUp),
+//             5 => Some(MouseButton::ScrollDown),
+//             _ => {
+//                 warn!("received mouse event with an invalid button
+// {detail}");                 None
+//             },
+//         }
+//     }
+// }
 
 #[derive(Debug)]
 pub(crate) struct Output {

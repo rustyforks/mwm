@@ -10,7 +10,7 @@ use crate::{event as ev, Point, Region};
 /// Polls as many XCB events as are in the queue
 pub fn _poll_xcb_events(xconn: Res<XConn>) -> Vec<xcb::GenericEvent> {
     let mut buf = Vec::new();
-    while let Some(ev) = xconn.poll_for_event() {
+    while let Some(ev) = xconn.conn.poll_for_event() {
         buf.push(ev);
     }
     buf
@@ -23,12 +23,12 @@ pub fn _poll_xcb_events(xconn: Res<XConn>) -> Vec<xcb::GenericEvent> {
 /// bevy event loop.
 pub fn wait_for_xcb_events(xconn: ResMut<XConn>) -> Vec<xcb::GenericEvent> {
     let mut buf = Vec::with_capacity(1);
-    if let Some(ev) = xconn.wait_for_event() {
+    if let Some(ev) = xconn.conn.wait_for_event() {
         buf.push(ev);
     } else {
         return buf;
     }
-    while let Some(ev) = xconn.poll_for_event() {
+    while let Some(ev) = xconn.conn.poll_for_event() {
         buf.push(ev);
     }
     buf
@@ -39,7 +39,7 @@ pub fn wait_for_xcb_events(xconn: ResMut<XConn>) -> Vec<xcb::GenericEvent> {
 /// Uses `ResMut` even though it only needs shared access to force blocking the
 /// bevy event loop.
 pub fn flush_xcb(xconn: ResMut<XConn>) {
-    let res = xconn.flush();
+    let res = xconn.conn.flush();
     if !res {
         warn!("xcb flush returned error");
     }
@@ -72,6 +72,8 @@ pub fn add_singleton_output(xconn: Res<XConn>, mut ev_screen_added: EventWriter<
 /// relies on matching the tags with the types.
 ///
 /// Make sure to check the types thoroughly!
+// NOTE hehe fair, but we do need all those `EventWriter`s
+#[allow(clippy::too_many_arguments)]
 pub fn process_xcb_events(
     In(events): In<Vec<xcb::GenericEvent>>,
     // mut ev_client_message: EventWriter<ev::ClientMessage>,

@@ -10,13 +10,13 @@ use crate::{xcb_event_type, KeyCode, MouseButton, Output, Point, Region};
 
 /// data for abstracting communication with the X server via xcb
 pub struct XConn {
-    conn: xcb::Connection,
+    pub(crate) conn: xcb::Connection,
 
-    root: XWinId,
-    check_win: XWinId,
+    pub(crate) root: XWinId,
+    pub(crate) check_win: XWinId,
 
     // interned atoms
-    atoms: HashMap<Atom, xcb::ffi::xproto::xcb_atom_t>,
+    pub(crate) atoms: HashMap<Atom, xcb::ffi::xproto::xcb_atom_t>,
 }
 
 impl Drop for XConn {
@@ -24,9 +24,9 @@ impl Drop for XConn {
         // release any of the keybindings we are holding on to
         xcb::ungrab_key(
             &self.conn, // xcb connection to X11
-            xcb::GRAB_ANY as u8,
+            xcb::GRAB_ANY.try_into().unwrap(),
             self.root.as_raw(), // the window to ungrab keys for
-            xcb::MOD_MASK_ANY as u16,
+            xcb::MOD_MASK_ANY.try_into().unwrap(),
         );
 
         // destroy the check window
@@ -39,7 +39,7 @@ impl Drop for XConn {
             self.atom_id(Atom::NetActiveWindow),
         );
 
-        self.flush();
+        self.conn.flush();
 
         // remove the RANDR_BASE constant to allow another connection to be created
         xcb_event_type::reset_randr_base();
@@ -60,6 +60,11 @@ impl XConn {
                 .root(),
         );
 
+        // NOTE the collect is actually very required here as the `xcb::intern_atom` has
+        // a side-effect and we need the run the iterator through to send all the
+        // requests now so cookies can be forced later with hopefully less
+        // latency.
+        #[allow(clippy::needless_collect)]
         let atom_cookies = Atom::ALL
             .iter()
             .map(|atom| xcb::intern_atom(&conn, false, atom.as_str()))
@@ -77,7 +82,7 @@ impl XConn {
             1,                  // width
             1,                  // height
             0,                  // border width
-            xcb::xproto::WINDOW_CLASS_INPUT_ONLY as u16,
+            xcb::xproto::WINDOW_CLASS_INPUT_ONLY.try_into().unwrap(),
             xcb::base::COPY_FROM_PARENT, // visual
             &[],                         // configuration (mask, value) list
         );
@@ -85,11 +90,13 @@ impl XConn {
         let select_input_cookie = xcb::randr::select_input(
             &conn,
             root.as_raw(),
-            (xcb::randr::NOTIFY_MASK_CRTC_CHANGE | xcb::randr::NOTIFY_MASK_SCREEN_CHANGE) as u16,
+            (xcb::randr::NOTIFY_MASK_CRTC_CHANGE | xcb::randr::NOTIFY_MASK_SCREEN_CHANGE)
+                .try_into()
+                .unwrap(),
         );
 
         let randr_base = conn
-            .get_extension_data(&mut xcb::randr::id())
+            .get_extension_data(xcb::randr::id())
             .context("fetching randr extension data")?
             .first_event();
         xcb_event_type::set_randr_base(randr_base)?;
@@ -120,18 +127,6 @@ impl XConn {
 
     pub fn atom_id(&self, atom: Atom) -> xcb::ffi::xproto::xcb_atom_t {
         *self.atoms.get(&atom).unwrap()
-    }
-
-    pub fn wait_for_event(&self) -> Option<xcb::GenericEvent> {
-        self.conn.wait_for_event()
-    }
-
-    pub fn poll_for_event(&self) -> Option<xcb::GenericEvent> {
-        self.conn.poll_for_event()
-    }
-
-    pub fn flush(&self) -> bool {
-        self.conn.flush()
     }
 
     pub fn get_window_attributes(
@@ -232,16 +227,6 @@ impl XConn {
                 | xcb::EVENT_MASK_LEAVE_WINDOW
                 | xcb::EVENT_MASK_PROPERTY_CHANGE,
         )]);
-    }
-
-    pub fn map_window(&self, id: XWinId) {
-        // TODO error handling
-        xcb::map_window(&self.conn, id.as_raw());
-    }
-
-    pub fn unmap_window(&self, id: XWinId) {
-        // TODO error handling
-        xcb::unmap_window(&self.conn, id.as_raw());
     }
 
     pub fn send_client_event(&self, id: XWinId, atom: Atom) -> Result<()> {

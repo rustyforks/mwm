@@ -6,6 +6,7 @@ use crate::component::*;
 use crate::event as ev;
 use crate::request::*;
 use crate::xcb_event_systems::*;
+use crate::xcb_request_systems::*;
 use crate::xconn::XConn;
 
 #[derive(Default)]
@@ -81,7 +82,7 @@ impl FromWorld for XConn {
     }
 }
 
-/// Responds to CreateNotify events and spawns window entities
+/// Reacts to [`ev::CreateNotify`] events and spawns new window entities
 fn spawn_windows(mut events: EventReader<ev::CreateNotify>, mut commands: Commands) {
     for &ev::CreateNotify { window, region, override_redirect, .. } in events.iter() {
         let mut entity = commands.spawn();
@@ -93,7 +94,8 @@ fn spawn_windows(mut events: EventReader<ev::CreateNotify>, mut commands: Comman
     }
 }
 
-/// Responds to DestroyNotify events and despawns window entities
+/// Reacts to [`ev::DestroyNotify`] events and despawns window entities with
+/// matching [`XWinId`]
 fn despawn_windows(
     mut events: EventReader<ev::DestroyNotify>,
     query: Query<(Entity, &XWinId)>,
@@ -109,7 +111,7 @@ fn despawn_windows(
     }
 }
 
-/// Responds to MapRequest events for unmapped windows only and maps them
+/// Reacts to [`ev::MapRequest`] for unmanaged windows only and maps them
 /// unconditionally as WMs are supposed to
 fn map_unmanaged_windows(
     mut events: EventReader<ev::MapRequest>,
@@ -126,22 +128,8 @@ fn map_unmanaged_windows(
     }
 }
 
-/// Turn RequestMap markers into XCB requests
-fn process_request_map(
-    xconn: Res<XConn>,
-    query: Query<(Entity, &XWinId, &RequestMap), Added<RequestMap>>,
-    mut commands: Commands,
-) {
-    for (entity, &window, request) in query.iter() {
-        match request {
-            RequestMap::Map => xconn.map_window(window),
-            RequestMap::Unmap => xconn.unmap_window(window),
-        }
-        commands.entity(entity).remove::<RequestMap>();
-    }
-}
-
-/// Responds to MapNotify events, adds IsMapped marker and clears MapRequest
+/// Reacts to [`ev::MapNotify`], adds [`IsMapped`] marker and clears
+/// [`RequestMap`] if present
 fn mark_mapped_windows(
     mut events: EventReader<ev::MapNotify>,
     query: Query<(Entity, &XWinId)>,
@@ -159,8 +147,8 @@ fn mark_mapped_windows(
     }
 }
 
-/// Responds to UnmapNotify events, removes IsMapped marker and clears
-/// MapRequest
+/// Reacts to [`ev::UnmapNotify`], removes [`IsMapped`] marker and clears
+/// [`RequestMap`] if present
 fn mark_unmapped_windows(
     mut events: EventReader<ev::UnmapNotify>,
     query: Query<(Entity, &XWinId)>,
@@ -175,35 +163,30 @@ fn mark_unmapped_windows(
     }
 }
 
-/// Responds to ConfigureRequest events and updates window's preferred size
+/// Reacts to [`ev::ConfigureRequest`], updates window's preferred
+/// size. If the window is not marked [`IsManaged`] it'll also add
+/// [`RequestConfigure`]
 fn mark_preffered_size_windows(
     mut events: EventReader<ev::ConfigureRequest>,
-    query: Query<(Entity, &XWinId)>,
+    query: Query<(Entity, &XWinId, &Option<IsManaged>)>,
     mut commands: Commands,
 ) {
     for &ev::ConfigureRequest { window, region, .. } in events.iter() {
-        for (entity, &id) in query.iter() {
+        for (entity, &id, is_managed) in query.iter() {
             if window == id {
                 debug!("configure window {id:?} {region:?}");
-                commands.entity(entity).insert(PrefferedSize(region));
+                let mut entity = commands.entity(entity);
+                entity.insert(PrefferedSize(region));
+                if is_managed.is_none() {
+                    entity.insert(RequestConfigure(region));
+                }
             }
         }
     }
 }
 
-/// Turn RequestResize markers into XCB requests
-fn process_request_resize(
-    xconn: Res<XConn>,
-    query: Query<(&XWinId, &RequestResize, &Size), Added<RequestResize>>,
-) {
-    for (&window, RequestResize(request), Size(size)) in query.iter() {
-        if request != size {
-            xconn.position_window(window, *request, 0);
-        }
-    }
-}
-
-/// Responds to ConfigureNotify events and updates window's actual size
+/// Reacts to [`ev::ConfigureNotify`] events and updates window's actual size
+/// [`Size`]
 fn mark_size_windows(
     mut events: EventReader<ev::ConfigureNotify>,
     query: Query<(Entity, &XWinId)>,
