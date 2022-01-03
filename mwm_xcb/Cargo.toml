@@ -9,4 +9,4 @@ bevy_app = "0.5.0"
 bevy_ecs = "0.5.0"
 log = "0.4.14"
 rustc-hash = "1.1.0"
-xcb = { version = "0.10.1", features = ["randr", "thread"] }
+xcb = { git = "https://github.com/pr2502/rust-xcb", branch ="std_error", features = ["randr"] }

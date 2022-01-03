@@ -1,6 +1,6 @@
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use mwm_xcb::component::{IsManaged, XWinId};
+use mwm_xcb::component::{IsManaged, Window};
 use mwm_xcb::event as ev;
 use mwm_xcb::request::RequestMap;
 
@@ -18,12 +18,12 @@ fn main() {
 
 fn map_all_windows(
     mut events: EventReader<ev::MapRequest>,
-    query: Query<(Entity, &XWinId), With<IsManaged>>,
+    query: Query<(Entity, &Window), With<IsManaged>>,
     mut commands: Commands,
 ) {
-    for &ev::MapRequest { window, .. } in events.iter() {
-        for (entity, &id) in query.iter() {
-            if window == id {
+    for e in events.iter() {
+        for (entity, &window) in query.iter() {
+            if window == e.window() {
                 commands.entity(entity).insert(RequestMap::Map);
             }
         }
