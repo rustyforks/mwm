@@ -1,17 +1,28 @@
 use anyhow::Context;
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
-use log::trace;
+use log::{trace, warn};
 use xcb::{randr, x};
 
 use crate::event as ev;
 use crate::xconn::XConn;
 
+fn parse_xcb_error<T>(r: xcb::Result<T>) -> xcb::Result<Option<T>> {
+    match r {
+        Ok(ok) => Ok(Some(ok)),
+        Err(xcb::Error::Protocol(xcb::ProtocolError::UnknownEvent)) => {
+            warn!("received unknown X event");
+            Ok(None)
+        },
+        Err(err) => Err(err),
+    }
+}
+
 /// Polls as many XCB events as are in the queue
 pub fn _poll_xcb_events(xconn: Res<XConn>) -> Vec<xcb::Event> {
     let mut buf = Vec::new();
-    while let Some(ev) = xconn.conn.poll_for_event().context("poll").unwrap() {
-        buf.push(ev);
+    while let Some(ev) = parse_xcb_error(xconn.conn.poll_for_event()).expect("xcb error") {
+        buf.extend(ev);
     }
     buf
 }
@@ -23,10 +34,15 @@ pub fn _poll_xcb_events(xconn: Res<XConn>) -> Vec<xcb::Event> {
 /// bevy event loop.
 pub fn wait_for_xcb_events(xconn: ResMut<XConn>) -> Vec<xcb::Event> {
     let mut buf = Vec::with_capacity(1);
-    let ev = xconn.conn.wait_for_event().context("wait").unwrap();
-    buf.push(ev);
-    while let Some(ev) = xconn.conn.poll_for_queued_event().context("poll").unwrap() {
-        buf.push(ev);
+    let ev = parse_xcb_error(xconn.conn.wait_for_event()).expect("xcb error");
+    buf.extend(ev);
+    loop {
+        match xconn.conn.poll_for_queued_event() {
+            Ok(None) => break,
+            Ok(Some(ev)) => buf.push(ev),
+            Err(xcb::ProtocolError::UnknownEvent) => {},
+            Err(err) => Err(err).expect("xcb error"),
+        }
     }
     buf
 }

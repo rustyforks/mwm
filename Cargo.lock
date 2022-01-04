@@ -876,7 +876,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "xcb"
 version = "1.0.0-beta.3"
-source = "git+https://github.com/pr2502/rust-xcb?branch=std_error#afeaee779d75102f464f668b9abe10bffd162ec9"
+source = "git+https://github.com/pr2502/rust-xcb?branch=mwm_patches#c0fdc761e4fb0af79da60e74f2a919a9a7dd4be0"
 dependencies = [
  "bitflags",
  "libc",
