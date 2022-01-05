@@ -27,6 +27,11 @@ pub mod component {
     #[derive(Debug)]
     pub struct PrefferedSize(pub Region);
 
+    /// Holds the window's last reported preffered border width, gets
+    /// inserted by CreateNotify events and updated by ConfigureRequest events
+    #[derive(Debug)]
+    pub struct PrefferedBorder(pub u16);
+
     /// Marks windows which are mapped.
     #[derive(Debug)]
     pub struct IsMapped;
@@ -34,6 +39,9 @@ pub mod component {
     /// Current window or screen size
     #[derive(Debug)]
     pub struct Size(pub Region);
+
+    #[derive(Debug)]
+    pub struct Border(pub u16);
 }
 
 /// Requests are either components or events which are generated in the `Update`
@@ -50,7 +58,11 @@ pub mod request {
 
     /// Requests the marked window entity to be resized and moved
     #[derive(Debug)]
-    pub struct RequestConfigure(pub Region);
+    pub struct RequestSize(pub Region);
+
+    /// Requests the marked window entity to have a border set
+    #[derive(Debug)]
+    pub struct RequestBorder(pub u16);
 }
 
 

@@ -41,7 +41,9 @@ impl XConn {
     /// Establish a new connection to the running X server. Fails if unable to
     /// connect
     pub(super) fn init() -> Result<XConn> {
-        let (conn, _) = xcb::Connection::connect(None).context("connecting to X server")?;
+        let (conn, _) =
+            xcb::Connection::connect_with_extensions(None, &[xcb::Extension::RandR], &[])
+                .context("connecting to X server")?;
 
         let root = conn
             .get_setup()

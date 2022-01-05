@@ -190,7 +190,7 @@ fn mark_unmapped_windows(
 /// [`RequestConfigure`]
 fn mark_preffered_size_windows(
     mut events: EventReader<ev::ConfigureRequest>,
-    query: Query<(Entity, &xcb::x::Window, &Option<IsManaged>)>,
+    query: Query<(Entity, &xcb::x::Window, Option<&IsManaged>)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
@@ -202,11 +202,11 @@ fn mark_preffered_size_windows(
                     w: e.width().into(),
                     h: e.height().into(),
                 };
-                debug!("configure window {window:?} {region:?}");
+                let border = e.border_width();
                 let mut entity = commands.entity(entity);
-                entity.insert(PrefferedSize(region));
+                entity.insert_bundle((PrefferedSize(region), PrefferedBorder(border)));
                 if is_managed.is_none() {
-                    entity.insert(RequestConfigure(region));
+                    entity.insert_bundle((RequestSize(region), RequestBorder(border)));
                 }
             }
         }
@@ -229,7 +229,10 @@ fn mark_size_windows(
                     w: e.width().into(),
                     h: e.height().into(),
                 };
-                commands.entity(entity).insert(Size(region));
+                let border = e.border_width();
+                commands
+                    .entity(entity)
+                    .insert_bundle((Size(region), Border(border)));
             }
         }
     }
