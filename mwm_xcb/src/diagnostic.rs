@@ -7,7 +7,7 @@ use log::debug;
 pub struct UpdateTimePlugin;
 
 impl Plugin for UpdateTimePlugin {
-    fn build(&self, app: &mut AppBuilder) {
+    fn build(&self, app: &mut App) {
         app.init_resource::<UpdateStart>()
             .add_system_to_stage(CoreStage::PreUpdate, update_time_start.system())
             .add_system_to_stage(CoreStage::PostUpdate, update_time_end.system());

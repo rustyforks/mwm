@@ -9,59 +9,78 @@ mod xconn;
 pub use plugin::XcbPlugin;
 
 pub mod component {
-    pub use xcb::x::Window;
+    use std::fmt::{self, Debug};
+
+    use bevy_ecs::component::Component;
 
     use crate::Region;
 
+    #[derive(Component, Clone, Copy)]
+    pub struct Window(pub xcb::x::Window);
+
+    impl Debug for Window {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            Debug::fmt(&self.0, f)
+        }
+    }
+
+    impl PartialEq<xcb::x::Window> for Window {
+        fn eq(&self, other: &xcb::x::Window) -> bool {
+            self.0 == *other
+        }
+    }
+
     /// Marks windows, layers, workspaces, screens,... as focused
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct IsFocused;
 
     /// Marks windows without the `override_redirect` flag - windows that should
     /// be managed by the window manager
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct IsManaged;
 
     /// Holds Region the window last reported as it's preffered dimensions, gets
     /// inserted by CreateNotify events and updated by ConfigureRequest events
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct PrefferedSize(pub Region);
 
     /// Holds the window's last reported preffered border width, gets
     /// inserted by CreateNotify events and updated by ConfigureRequest events
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct PrefferedBorder(pub u16);
 
     /// Marks windows which are mapped.
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct IsMapped;
 
     /// Current window or screen size
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct Size(pub Region);
 
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct Border(pub u16);
 }
 
 /// Requests are either components or events which are generated in the `Update`
 /// stage and read in the `PostUpdate` stage and turned into XCB requests
 pub mod request {
+    use bevy_ecs::component::Component;
+
     use crate::Region;
 
     /// Requests the marked window entity to be mapped or unmapped
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub enum RequestMap {
         Map,
         Unmap,
     }
 
     /// Requests the marked window entity to be resized and moved
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct RequestSize(pub Region);
 
     /// Requests the marked window entity to have a border set
-    #[derive(Debug)]
+    #[derive(Component, Debug)]
     pub struct RequestBorder(pub u16);
 }
 

@@ -11,7 +11,7 @@ pub fn process_request_map(
     query: Query<(Entity, &Window, &RequestMap, Option<&IsMapped>), Added<RequestMap>>,
     mut commands: Commands,
 ) {
-    for (entity, &window, request, is_mapped) in query.iter() {
+    for (entity, &Window(window), request, is_mapped) in query.iter() {
         match (is_mapped.is_some(), request) {
             (false, RequestMap::Map) => {
                 // TODO error handling
@@ -39,7 +39,7 @@ pub fn process_request_resize(
     xconn: Res<XConn>,
     query: Query<
         (
-            &xcb::x::Window,
+            &Window,
             Option<&RequestSize>,
             &Size,
             Option<&RequestBorder>,
@@ -48,7 +48,8 @@ pub fn process_request_resize(
         Or<(Added<RequestSize>, Added<RequestBorder>)>,
     >,
 ) {
-    for (&window, request_size, Size(size), request_border, Border(border)) in query.iter() {
+    for (&Window(window), request_size, Size(size), request_border, Border(border)) in query.iter()
+    {
         let mut cmd = Vec::new();
 
         if let Some(RequestSize(request)) = request_size {

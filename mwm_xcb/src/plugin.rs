@@ -1,7 +1,6 @@
 use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use log::debug;
-use xcb::x;
 
 use crate::component::*;
 use crate::request::*;
@@ -14,7 +13,7 @@ use crate::{event as ev, Region};
 pub struct XcbPlugin {}
 
 impl Plugin for XcbPlugin {
-    fn build(&self, builder: &mut bevy_app::AppBuilder) {
+    fn build(&self, builder: &mut App) {
         builder
             .add_event::<ev::KeyPress>()
             .add_event::<ev::KeyRelease>()
@@ -102,7 +101,7 @@ fn spawn_windows(mut events: EventReader<ev::CreateNotify>, mut commands: Comman
         let mut entity = commands.spawn();
         debug!("spawn window {window:?}", window = e.window());
         entity.insert_bundle((
-            e.window(),
+            Window(e.window()),
             PrefferedSize(Region {
                 x: e.x().into(),
                 y: e.y().into(),
@@ -117,10 +116,10 @@ fn spawn_windows(mut events: EventReader<ev::CreateNotify>, mut commands: Comman
 }
 
 /// Reacts to [`ev::DestroyNotify`] events and despawns window entities with
-/// matching [`x::Window`]
+/// matching [`Window`]
 fn despawn_windows(
     mut events: EventReader<ev::DestroyNotify>,
-    query: Query<(Entity, &x::Window)>,
+    query: Query<(Entity, &Window)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
@@ -137,7 +136,7 @@ fn despawn_windows(
 /// unconditionally as WMs are supposed to
 fn map_unmanaged_windows(
     mut events: EventReader<ev::MapRequest>,
-    query: Query<(Entity, &x::Window), (Without<IsMapped>, Without<IsManaged>)>,
+    query: Query<(Entity, &Window), (Without<IsMapped>, Without<IsManaged>)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
@@ -154,7 +153,7 @@ fn map_unmanaged_windows(
 /// [`RequestMap`] if present
 fn mark_mapped_windows(
     mut events: EventReader<ev::MapNotify>,
-    query: Query<(Entity, &x::Window)>,
+    query: Query<(Entity, &Window)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
@@ -173,13 +172,15 @@ fn mark_mapped_windows(
 /// [`RequestMap`] if present
 fn mark_unmapped_windows(
     mut events: EventReader<ev::UnmapNotify>,
-    query: Query<(Entity, &xcb::x::Window)>,
+    query: Query<(Entity, &Window)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
         for (entity, &window) in query.iter() {
             if window == e.window() {
-                commands.entity(entity).remove::<(RequestMap, IsMapped)>();
+                commands
+                    .entity(entity)
+                    .remove_bundle::<(RequestMap, IsMapped)>();
             }
         }
     }
@@ -190,7 +191,7 @@ fn mark_unmapped_windows(
 /// [`RequestConfigure`]
 fn mark_preffered_size_windows(
     mut events: EventReader<ev::ConfigureRequest>,
-    query: Query<(Entity, &xcb::x::Window, Option<&IsManaged>)>,
+    query: Query<(Entity, &Window, Option<&IsManaged>)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {
@@ -217,7 +218,7 @@ fn mark_preffered_size_windows(
 /// size [`Size`]
 fn mark_size_windows(
     mut events: EventReader<ev::ConfigureNotify>,
-    query: Query<(Entity, &xcb::x::Window)>,
+    query: Query<(Entity, &Window)>,
     mut commands: Commands,
 ) {
     for e in events.iter() {

@@ -1,5 +1,4 @@
 use anyhow::Context;
-use bevy_app::prelude::*;
 use bevy_ecs::prelude::*;
 use log::{trace, warn};
 use xcb::{randr, x};

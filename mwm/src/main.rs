@@ -7,7 +7,7 @@ use mwm_xcb::request::RequestMap;
 fn main() {
     pretty_env_logger::init();
 
-    App::build()
+    App::new()
         .add_plugin(mwm_xcb::XcbPlugin::default())
         .add_system(map_all_windows.system())
         .set_runner(|mut app| loop {
