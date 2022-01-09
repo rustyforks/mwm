@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0.52"
-bevy_app = { git = "https://github.com/bevyengine/bevy" }
-bevy_ecs = { git = "https://github.com/bevyengine/bevy" }
+bevy_app = "0.6"
+bevy_ecs = "0.6"
 log = "0.4.14"
 rustc-hash = "1.1.0"
-xcb = { git = "https://github.com/pr2502/rust-xcb", branch ="mwm_patches", features = ["randr"] }
+xcb = { git = "https://github.com/rust-x-bindings/rust-xcb", branch ="v1.0-dev", features = ["randr"] }

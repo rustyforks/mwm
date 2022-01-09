@@ -7,7 +7,7 @@ use crate::request::*;
 use crate::xcb_event_systems::*;
 use crate::xcb_request_systems::*;
 use crate::xconn::XConn;
-use crate::{event as ev, Region};
+use crate::{diagnostic, event as ev, Region};
 
 #[derive(Default)]
 pub struct XcbPlugin {}
@@ -51,7 +51,7 @@ impl Plugin for XcbPlugin {
             .add_event::<ev::ScreenChangeNotify>()
             .add_event::<ev::Notify>()
             .init_resource::<XConn>()
-            .add_plugin(crate::diagnostic::UpdateTimePlugin)
+            .add_plugin(diagnostic::UpdateTimePlugin)
             .add_system_set_to_stage(
                 CoreStage::First,
                 SystemSet::new().with_system(

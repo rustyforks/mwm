@@ -172,7 +172,7 @@ pub fn process_xcb_events(
                 },
                 randr::Event::Notify(ev) => ev_notify.send(ev::Notify(ev)),
             },
-            xcb::Event::Unknown => warn!("unknown event"),
+            xcb::Event::Unknown(ev) => warn!("unknown event {ev:?}"),
         }
     }
 }

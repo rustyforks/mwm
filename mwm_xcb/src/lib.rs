@@ -15,6 +15,7 @@ pub mod component {
 
     use crate::Region;
 
+    /// Wrapper for [`xcb::x::Window`] implementing the `Component` trait
     #[derive(Component, Clone, Copy)]
     pub struct Window(pub xcb::x::Window);
 
