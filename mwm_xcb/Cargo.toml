@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.52"
+anyhow = "1.0"
 bevy_app = "0.6"
 bevy_ecs = "0.6"
-log = "0.4.14"
-rustc-hash = "1.1.0"
-xcb = { git = "https://github.com/rust-x-bindings/rust-xcb", branch ="v1.0-dev", features = ["randr"] }
+log = "0.4"
+rustc-hash = "1.1"
+xcb = { version = "1.1", features = ["randr"] }
