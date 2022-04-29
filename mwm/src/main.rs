@@ -9,7 +9,7 @@ fn main() {
 
     App::new()
         .add_plugin(mwm_xcb::XcbPlugin::default())
-        .add_system(map_all_windows.system())
+        .add_system(map_all_windows)
         .set_runner(|mut app| loop {
             app.update();
         })

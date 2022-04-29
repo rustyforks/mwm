@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 mod atom;
 mod diagnostic;
 pub mod event;

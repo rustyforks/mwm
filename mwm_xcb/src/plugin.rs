@@ -54,33 +54,26 @@ impl Plugin for XcbPlugin {
             .add_plugin(diagnostic::UpdateTimePlugin)
             .add_system_set_to_stage(
                 CoreStage::First,
-                SystemSet::new().with_system(
-                    wait_for_xcb_events
-                        .system()
-                        .chain(process_xcb_events.system()),
-                ),
+                SystemSet::new().with_system(wait_for_xcb_events.chain(process_xcb_events)),
             )
             .add_system_set_to_stage(
                 CoreStage::Update,
                 SystemSet::new()
-                    .with_system(spawn_windows.system())
-                    .with_system(despawn_windows.system())
-                    .with_system(map_unmanaged_windows.system())
-                    .with_system(mark_mapped_windows.system())
-                    .with_system(mark_unmapped_windows.system())
-                    .with_system(mark_preffered_size_windows.system())
-                    .with_system(mark_size_windows.system()),
+                    .with_system(spawn_windows)
+                    .with_system(despawn_windows)
+                    .with_system(map_unmanaged_windows)
+                    .with_system(mark_mapped_windows)
+                    .with_system(mark_unmapped_windows)
+                    .with_system(mark_preffered_size_windows)
+                    .with_system(mark_size_windows),
             )
             .add_system_set_to_stage(
                 CoreStage::PostUpdate,
                 SystemSet::new()
-                    .with_system(process_request_map.system())
-                    .with_system(process_request_resize.system()),
+                    .with_system(process_request_map)
+                    .with_system(process_request_resize),
             )
-            .add_system_set_to_stage(
-                CoreStage::Last,
-                SystemSet::new().with_system(flush_xcb.system()),
-            );
+            .add_system_set_to_stage(CoreStage::Last, SystemSet::new().with_system(flush_xcb));
     }
 }
 

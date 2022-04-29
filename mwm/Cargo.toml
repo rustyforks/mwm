@@ -5,8 +5,8 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1.0"
-bevy_app = "0.6"
-bevy_ecs = "0.6"
+bevy_app = "0.7"
+bevy_ecs = "0.7"
 log = "0.4"
 mwm_xcb = { path = "../mwm_xcb" }
 pretty_env_logger = "0.4"
